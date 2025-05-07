@@ -13,7 +13,6 @@ import random
 
 SEGMENTATION_COLOURS = {0:[0,0,0],1:[255,0,0],2:[0,253,0],3:[0,0,250], 4:[253,255,0]}
 COLOUR_TO_INDEX = {tuple(v): k for k, v in SEGMENTATION_COLOURS.items()}
-RGB_VALUES = np.array(list(COLOUR_TO_INDEX.keys()))  
 
     
 class DoubleHorizontalFlip:
@@ -69,7 +68,6 @@ class MaskTransform:
         # Tolerant colour match
         for rgb, idx in COLOUR_TO_INDEX.items():
             matches = self._match_with_tolerance(mask, rgb)
-            # np.all(mask == rgb, axis=-1)
             target[matches] = idx
     
     
@@ -106,23 +104,16 @@ class ReverseMaskTransform:
         self.colours = np.array([SEGMENTATION_COLOURS[i] for i in range(len(SEGMENTATION_COLOURS))], dtype=np.uint8)
 
     def __call__(self, mask):
-        """
-        Args:
-            mask (Tensor or ndarray): 2D array of shape (H, W) with class indices.
-        
-        Returns:
-            PIL.Image: RGB image of shape (H, W, 3)
-        """
-        if hasattr(mask, 'cpu'):  # Torch Tensor
+        if hasattr(mask, 'cpu'):  
             mask = mask.cpu().numpy()
-        rgb = self.colours[mask]  # shape: (H, W, 3)
+        rgb = self.colours[mask]  
         return Image.fromarray(rgb)
 
         
 
 if __name__ == "__main__":
     """
-    Testing the data augmentation process. Only ran when file run as a script instead of imported as a module. 
+    Testing the data augmentation process by visualisation.
     """
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'Using device: {device}')

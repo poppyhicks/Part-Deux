@@ -18,7 +18,7 @@ from augmentation import (
 )
 
 SEGMENTATION_COLOURS = {0:[0,0,0],1:[255,0,0],2:[0,253,0],3:[0,0,250], 4:[253,255,0]}
-# Relative occurences of 
+# Relative occurences of classes in masks:
 class_rate = np.array([0.61165832, 0.10506157, 0.13500592, 0.11256629, 0.0357079 ])
     
 def calculate_iou(pred_mask, target_mask, num_classes=5):
