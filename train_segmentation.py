@@ -4,18 +4,23 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
-from dataloader import SegmentationDataset
-from model import UNet
-import matplotlib.pyplot as plt
+from data import SegmentationDataset
+from model import (UNet, initialize_weights)
 import numpy as np
 import os
 import csv
 import time
 from datetime import datetime
 
+from augmentation import (
+    DoubleCompose, DoubleHorizontalFlip, 
+    DoubleVerticalFlip, MaskTransform
+)
+
 SEGMENTATION_COLOURS = {0:[0,0,0],1:[255,0,0],2:[0,253,0],3:[0,0,250], 4:[253,255,0]}
-
-
+# Relative occurences of 
+class_rate = np.array([0.61165832, 0.10506157, 0.13500592, 0.11256629, 0.0357079 ])
+    
 def calculate_iou(pred_mask, target_mask, num_classes=5):
     ious = []
     
@@ -31,12 +36,14 @@ def calculate_iou(pred_mask, target_mask, num_classes=5):
         intersection = np.logical_and(pred_inds, target_inds).sum()
         union = np.logical_or(pred_inds, target_inds).sum()
         
-        iou = intersection / (union + 1e-6)  
+        iou = intersection / (union + 1e-6) 
         ious.append(iou)
     
     return np.mean(ious)
 
 def train_model(model, train_loader, val_loader, criterion, optimizer, num_epochs, device):
+
+    
     best_val_loss = float('inf')
     
     metrics_dir = 'metrics'
@@ -113,21 +120,32 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'Using device: {device}')
 
-    transform = transforms.Compose([
+    image_mask_transform = DoubleCompose([
+        DoubleHorizontalFlip(),
+        DoubleVerticalFlip()
+    ])
+
+    image_transform = transforms.Compose([
         transforms.Resize((256, 256)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    train_dataset = SegmentationDataset('dataset/train', transform=transform)
-    val_dataset = SegmentationDataset('dataset/val', transform=transform)
+    mask_transform = MaskTransform() 
+
+    train_dataset = SegmentationDataset('dataset/train/', image_mask_transform=image_mask_transform, image_transform=image_transform, mask_transform=mask_transform)
+    val_dataset = SegmentationDataset('dataset/val/', image_transform=image_transform, mask_transform=mask_transform)
 
     train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True, num_workers=4)
     val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False, num_workers=4)
 
     model = UNet(n_classes=5).to(device)
-    
-    criterion = nn.CrossEntropyLoss()
+    model.apply(initialize_weights)
+
+    base_weight = 0.25
+    class_loss_weight = torch.Tensor(class_rate.max() / class_rate * base_weight)
+
+    criterion = nn.CrossEntropyLoss(weight=class_loss_weight)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     train_model(model, train_loader, val_loader, criterion, optimizer, num_epochs=50, device=device)
